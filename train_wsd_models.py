@@ -70,7 +70,6 @@ def load_wsd_file(path: str):
     return sentences, labels
 
 
-
 def preprocess_sentences(sentences: List[str], target_word: str) -> List[str]:
     """
     Simple preprocessing:
@@ -92,8 +91,8 @@ def preprocess_sentences(sentences: List[str], target_word: str) -> List[str]:
 def train_one_word(
     word: str,
     train_filename: str,
-    ngram_range=(1, 2),
-    C: float = 1.0,
+    ngram_range=(1, 3),  # upgraded: include up to trigrams
+    C: float = 2.0,      # upgraded: a bit less regularization
 ):
     """
     Train a WSD model for a single word and save:
@@ -108,16 +107,22 @@ def train_one_word(
 
     X_proc = preprocess_sentences(sentences, word)
 
-    # TF-IDF vectorizer
+    # TF-IDF vectorizer (upgraded configuration)
     vectorizer = TfidfVectorizer(
         ngram_range=ngram_range,
         min_df=1,
-        max_df=0.95,
+        max_df=0.9,
+        sublinear_tf=True,   # dampen very frequent terms
     )
     X_vec = vectorizer.fit_transform(X_proc)
 
-    # Logistic Regression classifier
-    clf = LogisticRegression(max_iter=1000, C=C)
+    # Logistic Regression classifier (upgraded)
+    clf = LogisticRegression(
+        max_iter=2000,
+        C=C,
+        solver="liblinear",  # good for small binary problems
+        random_state=42,
+    )
     clf.fit(X_vec, labels)
 
     # Save model & vectorizer

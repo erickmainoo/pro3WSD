@@ -5,40 +5,33 @@ from cs5322f25prog3 import (
     WSD_Test_overtime,
     WSD_Test_rubbish,
 )
+import os
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_NAME = "Erick_Mainoo"   # <--- CHANGE THIS TO EXACT FORMAT YOUR PROF WANTS
 
-def load_test_sentences(path: str):
-    sentences = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.rstrip("\n")
-            if line.strip() == "":
-                continue  # skip completely empty lines
-            sentences.append(line)
-    return sentences
+def run_for_word(word, func):
+    input_file = os.path.join(BASE_DIR, f"{word}_test.txt")
+    if not os.path.exists(input_file):
+        print(f"Missing: {input_file}")
+        return
 
+    with open(input_file, "r", encoding="utf-8") as f:
+        sentences = [line.strip() for line in f if line.strip()]
 
-def save_results(path: str, labels):
-    with open(path, "w", encoding="utf-8") as f:
-        for lab in labels:
-            f.write(str(lab) + "\n")
+    results = func(sentences)
 
+    output_file = os.path.join(BASE_DIR, f"result_{word}_{OUTPUT_NAME}.txt")
+    with open(output_file, "w", encoding="utf-8") as f:
+        for r in results:
+            f.write(str(r) + "\n")
+
+    print(f"Created: {output_file}")
 
 def main():
-    # Adjust filenames if Canvas uses exact same names.
-    director_sents = load_test_sentences("director_test.txt")
-    overtime_sents = load_test_sentences("overtime_test.txt")
-    rubbish_sents = load_test_sentences("rubbish_test.txt")
-
-    director_pred = WSD_Test_director(director_sents)
-    overtime_pred = WSD_Test_overtime(overtime_sents)
-    rubbish_pred = WSD_Test_rubbish(rubbish_sents)
-
-    # Replace 'ErickMainoo' with whichever group member's name you decide to use
-    save_results("result_director_ErickMainoo.txt", director_pred)
-    save_results("result_overtime_ErickMainoo.txt", overtime_pred)
-    save_results("result_rubbish_ErickMainoo.txt", rubbish_pred)
-
+    run_for_word("director", WSD_Test_director)
+    run_for_word("overtime", WSD_Test_overtime)
+    run_for_word("rubbish", WSD_Test_rubbish)
 
 if __name__ == "__main__":
     main()
