@@ -5,38 +5,50 @@ import os
 import joblib
 
 
+# -----------------------------
+# Rule-based overrides
+# -----------------------------
+
 def _overtime_rule(sentence: str):
     """
     Rule-based override for 'overtime'.
     Return 1 or 2 if rule is confident, otherwise None.
     
     Sense 1: work done in addition to regular working hours
-    Sense 2: extra game time / sports context
+    Sense 2: extra game time beyond regulation, used to break a tie
     """
     s = sentence.lower()
 
+    # Work / labor context
     work_words = [
-        "work", "working", "hours", "shift", "shifts", "pay",
-        "paid", "unpaid", "wage", "wages", "salary", "employer",
-        "union", "office", "job", "manager", "management",
-        "compensation", "time bank", "holiday", "overtime work",
-        "collective agreement"
+        "work", "working", "hours", "shift", "shifts", "overtime shift",
+        "pay", "paid", "unpaid", "wage", "wages", "salary", "rate",
+        "employer", "employee", "staff", "union", "office", "job",
+        "manager", "management", "boss", "supervisor",
+        "compensation", "time bank", "holiday", "time-and-a-half",
+        "double time", "overtime work", "timesheet", "schedule"
     ]
+
+    # Sports / game context
     sport_words = [
         "game", "match", "team", "quarter", "period", "regulation",
-        "shootout", "goal", "goals", "score", "scored",
-        "basketball", "football", "hockey", "soccer",
-        "win", "loss", "losing", "playoffs", "ot", "pk", "penalty",
-        "field", "court", "coach", "head coach", "ncaa"
+        "shootout", "goal", "goals", "score", "scored", "scoring",
+        "basketball", "football", "soccer", "hockey", "baseball",
+        "playoffs", "postseason", "tournament", "finals",
+        "win", "loss", "losing", "victory", "defeat",
+        "ot", "pk", "penalty", "sudden death",
+        "field", "court", "arena", "stadium",
+        "coach", "head coach", "referee", "official"
     ]
 
     has_work = any(w in s for w in work_words)
     has_sport = any(w in s for w in sport_words)
 
-    # If clearly work context and not sport → sense 1
+    # Clearly work context only → sense 1
     if has_work and not has_sport:
         return 1
-    # If clearly sport context and not work → sense 2
+
+    # Clearly sports context only → sense 2
     if has_sport and not has_work:
         return 2
 
@@ -64,42 +76,60 @@ def _director_rule(sentence: str):
     has_film = any(w in s for w in film_words)
 
     if has_film:
-        return 2  # film/play director (sense 2)
+        # film/play/media context → sense 2
+        return 2
 
-    # Default: organization leader (sense 1)
+    # Default: organization leader → sense 1
     return 1
 
 
 def _rubbish_rule(sentence: str):
     """
     Rule-based override for 'rubbish'.
-    Sense 1: physical trash/garbage
-    Sense 2: 'nonsense' / low quality / bad idea
+
+    Sense 1: physical trash/garbage (literal rubbish)
+    Sense 2: 'nonsense' / 'low quality' / 'bad idea' (figurative)
     """
     s = sentence.lower()
 
+    # Literal trash context
     trash_words = [
         "bin", "bins", "garbage", "trash", "waste", "litter",
-        "landfill", "dump", "collection", "bag", "bags",
-        "recycling", "doorstep", "street", "pavement"
+        "landfill", "dump", "dumpster", "tip", "collection",
+        "bag", "bags", "black bag", "refuse", "debris",
+        "recycling", "rubbish truck", "garbage truck",
+        "doorstep", "street", "pavement", "alley", "kerb", "curb"
     ]
+
+    # Figurative "nonsense / bad" context
     nonsense_words = [
-        "nonsense", "idea", "argument", "theory", "policy",
-        "proposal", "opinion", "complete rubbish", "total rubbish",
-        "absolute rubbish", "utter rubbish", "excuse", "statement",
-        "claim", "review", "film", "movie"
+        "nonsense", "nonsensical", "ridiculous", "absurd",
+        "idea", "argument", "theory", "policy", "proposal",
+        "opinion", "excuse", "claim", "statement",
+        "review", "critique", "analysis",
+        "complete rubbish", "total rubbish",
+        "absolute rubbish", "utter rubbish",
+        "load of rubbish", "pile of rubbish"
     ]
 
     has_trash = any(w in s for w in trash_words)
     has_nonsense = any(w in s for w in nonsense_words)
 
     if has_trash and not has_nonsense:
-        return 1  # physical trash
-    if has_nonsense and not has_trash:
-        return 2  # nonsense / criticism
+        # literal garbage → sense 1
+        return 1
 
+    if has_nonsense and not has_trash:
+        # figurative nonsense → sense 2
+        return 2
+
+    # Ambiguous or neutral: let ML decide
     return None
 
+
+# -----------------------------
+# Model loading and prediction
+# -----------------------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "models")
@@ -107,7 +137,7 @@ MODEL_DIR = os.path.join(BASE_DIR, "models")
 
 def _load_model_for_word(word: str):
     """
-    Load vectorizer and classifier for the given word.
+    Load TF-IDF vectorizer and classifier for the given word.
     """
     vec_path = os.path.join(MODEL_DIR, f"{word}_vectorizer.joblib")
     model_path = os.path.join(MODEL_DIR, f"{word}_model.joblib")
@@ -143,18 +173,19 @@ def _preprocess_for_word(sentences: List[str], word: str) -> List[str]:
 def _predict_word(word: str, sentences: List[str]) -> List[int]:
     """
     Generic prediction helper for a single word.
-    Uses rule-based overrides first, then ML model as fallback.
-    For 'director', rules are strong enough to always decide.
+
+    Pipeline:
+    1. Try rule-based override for the word.
+    2. If rule is not confident (returns None), fall back to the ML classifier.
     """
     if not sentences:
         return []
 
     vectorizer, clf = _load_model_for_word(word)
-
     final_preds: List[int] = []
 
     for sent in sentences:
-        # 1) Try rule-based override
+        # 1) Rule-based override
         rule_label = None
         if word == "overtime":
             rule_label = _overtime_rule(sent)
@@ -167,7 +198,7 @@ def _predict_word(word: str, sentences: List[str]) -> List[int]:
             final_preds.append(rule_label)
             continue
 
-        # 2) Fall back to model
+        # 2) ML fallback
         processed = _preprocess_for_word([sent], word)
         X_vec = vectorizer.transform(processed)
         model_pred = clf.predict(X_vec)[0]
@@ -175,6 +206,10 @@ def _predict_word(word: str, sentences: List[str]) -> List[int]:
 
     return final_preds
 
+
+# -----------------------------
+# Public API (required by prof)
+# -----------------------------
 
 def WSD_Test_director(sent_list: List[str]) -> List[int]:
     """
@@ -198,3 +233,4 @@ def WSD_Test_overtime(sent_list: List[str]) -> List[int]:
     Output: list of sense IDs (1 or 2)
     """
     return _predict_word("overtime", sent_list)
+

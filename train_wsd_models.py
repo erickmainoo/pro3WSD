@@ -8,7 +8,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 
 
-# Directories (you can adjust these if needed)
+# Directories 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 MODEL_DIR = os.path.join(BASE_DIR, "models")
@@ -138,7 +138,7 @@ def train_one_word(
 
 
 def main():
-    # Adjust filenames here if your prof used slightly different names.
+    # Adjust filenames here.
     train_one_word("director", "director.txt")
     train_one_word("overtime", "overtime.txt")
     train_one_word("rubbish", "rubbish.txt")
